@@ -4,5 +4,4 @@ pynndescent
 llvmlite>=0.34.0
 sklearn
 umap-learn
-torchsummary
 pytorch_lightning

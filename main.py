@@ -9,6 +9,7 @@ from torch.nn.functional import mse_loss
 from model import conv
 from data import UMAPDataset
 from modules import umap_loss, get_umap_graph
+from umap.umap_ import find_ab_params
 
 
 """ Model """
@@ -18,23 +19,21 @@ class Model(pl.LightningModule):
     def __init__(
         self,
         lr: float,
-        model: nn.Module,
-        n_components=2,
+        encoder: nn.Module,
         min_dist=0.1,
     ):
         super().__init__()
         self.lr = lr
-        self.model = model
-        self.n_components = n_components
-        self.min_dist = min_dist
+        self.encoder = encoder
+        self._a, self._b = find_ab_params(1.0, min_dist)
 
-    def configure_optimizers(self): 
-        return torch.optim.AdamW(self.parameters(), lr=self.lr,)
+    def configure_optimizers(self):
+        return torch.optim.AdamW(self.parameters(), lr=self.lr)
 
     def training_step(self, batch, batch_idx):
         (edges_to_exp, edges_from_exp) = batch
-        embedding_to, embedding_from = self.model(edges_to_exp), self.model(edges_from_exp)
-        loss = umap_loss(embedding_to, embedding_from, edges_to_exp.shape[0], self.min_dist)
+        embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
+        loss = umap_loss(embedding_to, embedding_from, self._a, self._b, edges_to_exp.shape[0])
         self.log("train_loss", loss)
         return loss
 
@@ -65,47 +64,54 @@ class Datamodule(pl.LightningDataModule):
 class PUMAP():
     def __init__(
         self,
-        model,
-        n_neighbors=15,
+        encoder,
+        n_neighbors=10,
         min_dist=0.1,
-        n_components=2,
-        metric="cosine",
-        lr = 1e-5,
-        epochs = 50,
-        batch_size=1024,
+        metric="euclidean",
+        lr=1e-3,
+        epochs=30,
+        batch_size=64,
         num_workers=1,
-        random_state = None,
+        random_state=None,
     ):
-        self.model = model
+        self.encoder = encoder
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
-        self.n_components = n_components
         self.metric = metric
         self.lr = lr
-        self.epochs = 50
+        self.epochs = epochs
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.random_state = random_state
         
     def fit(self, X):
         trainer = pl.Trainer(accelerator='gpu', devices=1, max_epochs=self.epochs)
+        self.model = Model(self.lr, self.encoder, min_dist=self.min_dist)
         graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
         trainer.fit(
-            model=Model(self.lr, self.model, n_components=self.n_components, min_dist=self.min_dist),
+            model=self.model,
             datamodule=Datamodule(UMAPDataset(X, graph), self.batch_size, self.num_workers)
             )
+    @torch.no_grad()
+    def transform(self, X):
+        self.embedding_ = self.model.encoder(X).detach().cpu().numpy()
+        return self.embedding_
+        
 
 
 if __name__== "__main__":
-    from torchvision.datasets import MNIST
     import torchvision
     from torchvision.transforms import transforms
-    
-    a = Model(1e-5, conv(2), n_components=2, min_dist=0.1)
+    import matplotlib.pyplot as plt
     
     train_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
     train_tensor = torch.stack([example[0] for example in train_dataset])[:, 0][:, None, ...]
+    labels = [str(example[1]) for example in train_dataset]
     X = train_tensor
 
-    PUMAP = PUMAP(conv(2))
+    PUMAP = PUMAP(conv(2), epochs=4, num_workers=8)
     PUMAP.fit(X)
+    import seaborn as sns
+    embedding = PUMAP.transform(X)
+    sns.scatterplot(x=embedding[:,0], y=embedding[:,1], hue=labels, s=0.4)
+    plt.savefig('test2.png')

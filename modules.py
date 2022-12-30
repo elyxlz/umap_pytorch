@@ -3,10 +3,6 @@ import numpy as np
 from sklearn.utils import check_random_state
 from umap.umap_ import fuzzy_simplicial_set
 import torch
-import torch.nn as nn
-import torchsummary
-from umap.umap_ import find_ab_params
-
 
 def convert_distance_to_probability(distances, a=1.0, b=1.0):
     return 1.0 / (1.0 + a * distances ** (2 * b))
@@ -28,8 +24,7 @@ def compute_cross_entropy(
     CE = attraction_term + repellant_term
     return attraction_term, repellant_term, CE
 
-def umap_loss(embedding_to, embedding_from, batch_size, min_dist=0.1, negative_sample_rate=5):
-    _a, _b = find_ab_params(1.0, min_dist)
+def umap_loss(embedding_to, embedding_from, _a, _b, batch_size, negative_sample_rate=5):
     # grab z for the edge
 
     # get negative samples by randomly shuffling the batch
@@ -58,7 +53,7 @@ def umap_loss(embedding_to, embedding_from, batch_size, min_dist=0.1, negative_s
     loss = torch.mean(ce_loss)
     return loss
 
-def get_umap_graph(X, n_neighbors=15, metric="cosine", random_state=None):
+def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None):
     dims = X.shape[1:]
     random_state = check_random_state(None) if random_state == None else random_state
     # number of trees in random projection forest
