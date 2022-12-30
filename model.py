@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class conv(nn.Module):
-    def __init__(self, n_components):
+    def __init__(self, n_components=2):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(
@@ -18,5 +18,11 @@ class conv(nn.Module):
             nn.ReLU(),
             nn.Linear(512, n_components)
         ).cuda()
-    def __forward__(self, X):
+    def forward(self, X):
         return self.encoder(X)
+    
+
+if __name__ == "__main__":
+    model = conv(2)
+    print(model.parameters)
+    print(model(torch.randn((12,1,28,28)).cuda()).shape)
