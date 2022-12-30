@@ -1,7 +1,7 @@
 torch
 torchvision
 pynndescent
-#https://github.com/lmcinnes/umap/archive/0.5dev.zip
 llvmlite>=0.34.0
 sklearn
 umap-learn
+torchsummary
