@@ -8,8 +8,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```py
-import umap_pytorch.main.PUMAP as PUMAP
-import umap_pytorch.model.conv as conv
+from umap_pytorch import PUMAP, conv
 
 encoder = conv(n_components=2)
 PUMAP = PUMAP(encoder, n_neighbors=10, min_dist=0.1, epochs=5)
