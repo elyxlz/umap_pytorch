@@ -25,8 +25,6 @@ def compute_cross_entropy(
     return attraction_term, repellant_term, CE
 
 def umap_loss(embedding_to, embedding_from, _a, _b, batch_size, negative_sample_rate=5):
-    # grab z for the edge
-
     # get negative samples by randomly shuffling the batch
     embedding_neg_to = embedding_to.repeat(negative_sample_rate, 1)
     repeat_neg = embedding_from.repeat(negative_sample_rate, 1)
@@ -54,7 +52,6 @@ def umap_loss(embedding_to, embedding_from, _a, _b, batch_size, negative_sample_
     return loss
 
 def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None):
-    dims = X.shape[1:]
     random_state = check_random_state(None) if random_state == None else random_state
     # number of trees in random projection forest
     n_trees = 5 + int(round((X.shape[0]) ** 0.5 / 20.0))

@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: umap-pytorch
+Version: 0.0.1
+Summary: Umap port for pytorch
+Home-page: https://github.com/elyxlz/umap_pytorch
+Author: Elio Pascarelli
+Author-email: elio@pascarelli.com
+License: MIT
+Keywords: artificial intelligence,deep learning,dimensionality reduction,UMAP
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE

@@ -1,0 +1,12 @@
+LICENSE
+setup.py
+umap_pytorch/__init__.py
+umap_pytorch/data.py
+umap_pytorch/main.py
+umap_pytorch/model.py
+umap_pytorch/modules.py
+umap_pytorch.egg-info/PKG-INFO
+umap_pytorch.egg-info/SOURCES.txt
+umap_pytorch.egg-info/dependency_links.txt
+umap_pytorch.egg-info/requires.txt
+umap_pytorch.egg-info/top_level.txt

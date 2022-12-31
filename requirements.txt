@@ -1,7 +1,0 @@
-torch
-torchvision
-pynndescent
-llvmlite>=0.34.0
-sklearn
-umap-learn
-pytorch_lightning
