@@ -2,7 +2,7 @@ Parametric UMAP port for pytorch using pytorch lightning for the training loop.
 
 ## Install
 ```bash
-pip install -r requirements.txt
+pip install umap-pytorch
 ```
 
 ## Usage
