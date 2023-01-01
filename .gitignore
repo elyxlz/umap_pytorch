@@ -6,3 +6,4 @@ __pycache__/
 lightning_logs/
 *.png
 umap_pytorch.egg-info/
+dist/
