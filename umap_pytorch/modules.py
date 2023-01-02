@@ -5,20 +5,19 @@ from umap.umap_ import fuzzy_simplicial_set
 import torch
 
 def convert_distance_to_probability(distances, a=1.0, b=1.0):
-    return 1.0 / (1.0 + a * distances ** (2 * b))
+    return -torch.log1p(a * distances ** (2 * b))
 
 def compute_cross_entropy(
     probabilities_graph, probabilities_distance, EPS=1e-4, repulsion_strength=1.0
 ):
     # cross entropy
-    attraction_term = -probabilities_graph * torch.log(
-        torch.clamp(probabilities_distance, min=EPS, max=1.0)
+    attraction_term = -probabilities_graph * torch.nn.functional.logsigmoid(
+        probabilities_distance
     )
     repellant_term = (
         -(1.0 - probabilities_graph)
-        * torch.log(torch.clamp(1.0 - probabilities_distance, min=EPS, max=1.0))
-        * repulsion_strength
-    )
+        * (torch.nn.functional.logsigmoid(probabilities_distance)-probabilities_distance)
+        * repulsion_strength)
 
     # balance the expected losses between atrraction and repel
     CE = attraction_term + repellant_term

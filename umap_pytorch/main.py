@@ -4,7 +4,9 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn.functional import mse_loss
 
-from umap_pytorch import conv, UMAPDataset, umap_loss, get_umap_graph
+from umap_pytorch.data import UMAPDataset
+from umap_pytorch.modules import get_umap_graph, umap_loss
+
 from umap.umap_ import find_ab_params
 
 
@@ -122,10 +124,3 @@ if __name__== "__main__":
     train_tensor = torch.stack([example[0] for example in train_dataset])[:, 0][:, None, ...]
     labels = [str(example[1]) for example in train_dataset]
     X = train_tensor
-    
-    PUMAP = PUMAP(conv(2), lr=1e-3, epochs=4, num_workers=8)
-    PUMAP.fit(X)
-    embedding = PUMAP.transform(X)
-    import seaborn as sns
-    sns.scatterplot(x=embedding[:,0], y=embedding[:,1], hue=labels, s=0.4)
-    plt.savefig('test3.png')
