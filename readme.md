@@ -8,23 +8,39 @@ pip install umap-pytorch
 ## Usage
 
 ```py
-from umap_pytorch import PUMAP, conv
+from umap_pytorch import PUMAP
 
-encoder = conv(n_components=2)
 pumap = PUMAP(
-        encoder,              # pytorch encoder module
-        decoder=None,         # pytorch decoder module
+        encoder=None,           # nn.Module, None for default
+        decoder=None,           # nn.Module, True for default, None for encoder only
         n_neighbors=10,
         min_dist=0.1,
         metric="euclidean",
+        n_components=2,
+        beta=1.0,               # How much to weigh reconstruction loss for decoder
+        random_state=None,
         lr=1e-3,
-        epochs=30,
+        epochs=10,
         batch_size=64,
         num_workers=1,
-        random_state=None
+        num_gpus=1,
 )
 
 data = torch.randn((50000, 512))
 pumap.fit(data)
 embedding = pumap.transform(data) # (50000, 2)
+
+# if decoder enabled
+recon = pumap.inverse_transform(embedding)  # (50000, 512)
+```
+
+## Saving and Loading
+```py
+# Saving
+path = 'some/path/hello.pkl'
+pumap.save(path)
+
+# Loading
+from umap_pytorch import load_pumap
+pumap = load_pumap(path)
 ```
