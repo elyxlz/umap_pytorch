@@ -22,10 +22,10 @@ setup(
     'pynndescent',
     'llvmlite>=0.34.0',
     'torch>=1.6',
-    'torchvision',
     'sklearn',
     'umap-learn',
     'pytorch_lightning',
+    'dill',
   ],
   classifiers=[
     'Development Status :: 4 - Beta',
