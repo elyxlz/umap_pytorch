@@ -4,13 +4,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn.functional import mse_loss
 
-from umap_pytorch.data import UMAPDataset
+from umap_pytorch.data import UMAPDataset, MatchDataset
 from umap_pytorch.modules import get_umap_graph, umap_loss
 from umap_pytorch.model import default_encoder, default_decoder
 
 from umap.umap_ import find_ab_params
 import dill
-
+from umap import UMAP
 
 """ Model """
 
@@ -23,31 +23,46 @@ class Model(pl.LightningModule):
         decoder=None,
         beta = 1.0,
         min_dist=0.1,
+        match_nonparametric_umap=False,
     ):
         super().__init__()
         self.lr = lr
         self.encoder = encoder
         self.decoder = decoder
         self.beta = beta # weight for reconstruction loss
+        self.match_nonparametric_umap = match_nonparametric_umap
         self._a, self._b = find_ab_params(1.0, min_dist)
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
 
     def training_step(self, batch, batch_idx):
-        (edges_to_exp, edges_from_exp) = batch
-        embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
-        encoder_loss = umap_loss(embedding_to, embedding_from, self._a, self._b, edges_to_exp.shape[0], negative_sample_rate=5)
-        self.log("umap_loss", encoder_loss)
-        
-        if self.decoder is not None:
-            recon = self.decoder(embedding_to)
-            recon_loss = mse_loss(recon, edges_to_exp)
-            self.log("recon_loss", recon_loss)
-            return encoder_loss + self.beta * recon_loss
+        if not self.match_nonparametric_umap:
+            (edges_to_exp, edges_from_exp) = batch
+            embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
+            encoder_loss = umap_loss(embedding_to, embedding_from, self._a, self._b, edges_to_exp.shape[0], negative_sample_rate=5)
+            self.log("umap_loss", encoder_loss)
+            
+            if self.decoder:
+                recon = self.decoder(embedding_to)
+                recon_loss = torch.nn.BCEWithLogitsLoss()(recon, edges_to_exp)
+                self.log("recon_loss", recon_loss)
+                return encoder_loss + self.beta * recon_loss
+            else:
+                return encoder_loss
+            
         else:
-            return encoder_loss
-
+            data, embedding = batch
+            embedding_parametric = self.encoder(data)
+            encoder_loss = mse_loss(embedding_parametric, embedding)
+            if self.decoder:
+                recon = self.decoder(embedding_parametric)
+                recon_loss = torch.nn.BCEWithLogitsLoss()(recon, data)
+                self.log("recon_loss", recon_loss)
+                return encoder_loss + self.beta * recon_loss
+            else:
+                return encoder_loss
+            
 
 """ Datamodule """
 
@@ -88,6 +103,7 @@ class PUMAP():
         batch_size=64,
         num_workers=1,
         num_gpus=1,
+        match_nonparametric_umap=False,
     ):
         self.encoder = encoder
         self.decoder = decoder
@@ -102,7 +118,8 @@ class PUMAP():
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.num_gpus = num_gpus
-
+        self.match_nonparametric_umap = match_nonparametric_umap
+        
     def fit(self, X):
         trainer = pl.Trainer(accelerator='gpu', devices=1, max_epochs=self.epochs)
         encoder = default_encoder(X.shape[1:], self.n_components) if self.encoder is None else self.encoder
@@ -112,11 +129,23 @@ class PUMAP():
         elif self.decoder == True:
             decoder = default_decoder(X.shape[1:], self.n_components)
             
-        self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist)
-        graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
-        trainer.fit(
-            model=self.model,
-            datamodule=Datamodule(UMAPDataset(X, graph), self.batch_size, self.num_workers)
+            
+        if not self.match_nonparametric_umap:
+            self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist)
+            graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
+            trainer.fit(
+                model=self.model,
+                datamodule=Datamodule(UMAPDataset(X, graph), self.batch_size, self.num_workers)
+                )
+        else:
+            print("Fitting Non parametric Umap")
+            non_parametric_umap = UMAP(n_neighbors=self.n_neighbors, min_dist=self.min_dist, metric=self.metric, n_components=self.n_components, random_state=self.random_state, verbose=True)
+            non_parametric_embeddings = non_parametric_umap.fit_transform(torch.flatten(X, 1, -1).numpy())
+            self.model = Model(self.lr, encoder, decoder, beta=self.beta, match_nonparametric_umap=self.match_nonparametric_umap)
+            print("Training NN to match embeddings")
+            trainer.fit(
+                model=self.model,
+                datamodule=Datamodule(MatchDataset(X, non_parametric_embeddings), self.batch_size, self.num_workers)
             )
         
     @torch.no_grad()

@@ -48,3 +48,12 @@ class UMAPDataset(Dataset):
         edges_to_exp = self.data[self.edges_to_exp[index]]
         edges_from_exp = self.data[self.edges_from_exp[index]]
         return (edges_to_exp, edges_from_exp)
+    
+class MatchDataset(Dataset):
+    def __init__(self, data, embeddings):
+        self.embeddings = torch.Tensor(embeddings)
+        self.data = data
+    def __len__(self):
+        return int(self.data.shape[0])
+    def __getitem__(self, index):
+        return self.data[index], self.embeddings[index]
