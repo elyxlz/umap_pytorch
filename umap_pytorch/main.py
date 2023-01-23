@@ -3,6 +3,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn.functional import mse_loss
+import torch.nn.functional as F
 
 from umap_pytorch.data import UMAPDataset, MatchDataset
 from umap_pytorch.modules import get_umap_graph, umap_loss
@@ -23,6 +24,7 @@ class Model(pl.LightningModule):
         decoder=None,
         beta = 1.0,
         min_dist=0.1,
+        reconstruction_loss=F.binary_cross_entropy_with_logits,
         match_nonparametric_umap=False,
     ):
         super().__init__()
@@ -31,6 +33,7 @@ class Model(pl.LightningModule):
         self.decoder = decoder
         self.beta = beta # weight for reconstruction loss
         self.match_nonparametric_umap = match_nonparametric_umap
+        self.reconstruction_loss = reconstruction_loss
         self._a, self._b = find_ab_params(1.0, min_dist)
 
     def configure_optimizers(self):
@@ -41,12 +44,12 @@ class Model(pl.LightningModule):
             (edges_to_exp, edges_from_exp) = batch
             embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
             encoder_loss = umap_loss(embedding_to, embedding_from, self._a, self._b, edges_to_exp.shape[0], negative_sample_rate=5)
-            self.log("umap_loss", encoder_loss)
+            self.log("umap_loss", encoder_loss, prog_bar=True)
             
             if self.decoder:
                 recon = self.decoder(embedding_to)
-                recon_loss = torch.nn.BCEWithLogitsLoss()(recon, edges_to_exp)
-                self.log("recon_loss", recon_loss)
+                recon_loss = self.reconstruction_loss(recon, edges_to_exp)
+                self.log("recon_loss", recon_loss, prog_bar=True)
                 return encoder_loss + self.beta * recon_loss
             else:
                 return encoder_loss
@@ -55,10 +58,11 @@ class Model(pl.LightningModule):
             data, embedding = batch
             embedding_parametric = self.encoder(data)
             encoder_loss = mse_loss(embedding_parametric, embedding)
+            self.log("encoder_loss", encoder_loss, prog_bar=True)
             if self.decoder:
                 recon = self.decoder(embedding_parametric)
-                recon_loss = torch.nn.BCEWithLogitsLoss()(recon, data)
-                self.log("recon_loss", recon_loss)
+                recon_loss = self.reconstruction_loss(recon, data)
+                self.log("recon_loss", recon_loss, prog_bar=True)
                 return encoder_loss + self.beta * recon_loss
             else:
                 return encoder_loss
@@ -97,6 +101,7 @@ class PUMAP():
         metric="euclidean",
         n_components=2,
         beta=1.0,
+        reconstruction_loss=F.binary_cross_entropy_with_logits,
         random_state=None,
         lr=1e-3,
         epochs=10,
@@ -112,6 +117,7 @@ class PUMAP():
         self.metric = metric
         self.n_components = n_components
         self.beta = beta
+        self.reconstruction_loss = reconstruction_loss
         self.random_state = random_state
         self.lr = lr
         self.epochs = epochs
@@ -131,7 +137,7 @@ class PUMAP():
             
             
         if not self.match_nonparametric_umap:
-            self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist)
+            self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist, reconstruction_loss=self.reconstruction_loss)
             graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
             trainer.fit(
                 model=self.model,
@@ -141,7 +147,7 @@ class PUMAP():
             print("Fitting Non parametric Umap")
             non_parametric_umap = UMAP(n_neighbors=self.n_neighbors, min_dist=self.min_dist, metric=self.metric, n_components=self.n_components, random_state=self.random_state, verbose=True)
             non_parametric_embeddings = non_parametric_umap.fit_transform(torch.flatten(X, 1, -1).numpy())
-            self.model = Model(self.lr, encoder, decoder, beta=self.beta, match_nonparametric_umap=self.match_nonparametric_umap)
+            self.model = Model(self.lr, encoder, decoder, beta=self.beta, reconstruction_loss=self.reconstruction_loss, match_nonparametric_umap=self.match_nonparametric_umap)
             print("Training NN to match embeddings")
             trainer.fit(
                 model=self.model,

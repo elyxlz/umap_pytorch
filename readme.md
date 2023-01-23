@@ -18,6 +18,7 @@ pumap = PUMAP(
         metric="euclidean",
         n_components=2,
         beta=1.0,               # How much to weigh reconstruction loss for decoder
+        reconstruction_loss=F.binary_cross_entropy_with_logits, # pass in custom reconstruction loss functions
         random_state=None,
         lr=1e-3,
         epochs=10,

@@ -4,7 +4,7 @@ setup(
   name = 'umap_pytorch',
   packages = find_packages(exclude=[]),
   include_package_data = True,
-  version = '0.0.05',
+  version = '0.0.06',
   license='MIT',
   description = 'Umap port for pytorch',
   author = 'Elio Pascarelli',
