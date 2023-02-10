@@ -22,7 +22,7 @@ setup(
     'pynndescent',
     'llvmlite>=0.34.0',
     'torch>=1.6',
-    'sklearn',
+    'scikit-learn',
     'umap-learn',
     'pytorch_lightning',
     'dill',
